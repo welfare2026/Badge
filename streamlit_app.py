@@ -1,5 +1,63 @@
 import streamlit as st
 from supabase import create_client
+
+# 1. Initialize Supabase
+supabase = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+
+# --- LOGIN SYSTEM ---
+if 'user' not in st.session_state:
+    st.session_state.user = None
+
+if st.session_state.user is None:
+    st.header("🔑 Login to Gate Pass System")
+    user_input = st.text_input("Username")
+    pass_input = st.text_input("Password", type="password")
+    
+    if st.button("Login"):
+        res = supabase.table("app_users").select("*").eq("username", user_input).eq("password", pass_input).execute()
+        if res.data:
+            st.session_state.user = res.data[0]
+            st.rerun()
+        else:
+            st.error("Invalid credentials")
+    st.stop()
+
+# Get current user info
+user_role = st.session_state.user['role']
+username = st.session_state.user['username']
+
+st.sidebar.write(f"Logged in as: **{username}** ({user_role})")
+if st.sidebar.button("Logout"):
+    st.session_state.user = None
+    st.rerun()
+
+# --- ADMIN PANEL (Only for Approver/Admin role) ---
+if user_role == "Approver":
+    with st.sidebar.expander("⚙️ Admin Settings"):
+        st.subheader("Add New User")
+        new_user = st.text_input("New Username")
+        new_pass = st.text_input("New Password", type="password")
+        new_role = st.selectbox("Assign Role", ["Creator", "Approver", "Security"])
+        
+        if st.button("Create User"):
+            supabase.table("app_users").insert({
+                "username": new_user, "password": new_pass, "role": new_role
+            }).execute()
+            st.success("User added!")
+
+# --- ROLE-BASED NAVIGATION ---
+menu = []
+if user_role == "Creator":
+    menu = ["Employee Portal"]
+elif user_role == "Approver":
+    menu = ["Employee Portal", "Security Dashboard"]
+elif user_role == "Security":
+    menu = ["Gate Control (Guard)"]
+
+page = st.sidebar.radio("Navigation", menu)
+
+import streamlit as st
+from supabase import create_client
 import base64
 
 # 1. Initialize Supabase
